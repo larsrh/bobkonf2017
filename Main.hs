@@ -4,6 +4,7 @@ module Main where
 
 import qualified Data.List as List
 import Data.Maybe (isJust)
+import qualified Data.Set as Set
 import Test.QuickCheck.Poly
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
@@ -31,7 +32,7 @@ tests = testGroup "Bobkonf"
 
 exercise0 :: TestTree
 exercise0 = QC.testProperty "Hello World" prop
-  where prop = False
+  where prop = BEx0.hello == "Hello World!"
 
 -- Exercise 1: Sorting
 --
@@ -62,9 +63,24 @@ exercise1 = testGroup "Sorting"
   ]
 
 sortingTests :: TestName -> SortingFunction -> TestTree
-sortingTests name sort = testGroup name [propDummy]
+sortingTests name sort = testGroup name [propDummy, prop1, prop2, prop3]
   where propDummy = QC.testProperty "Dummy property" $ \xs ->
                       sort xs == sort (xs::[OrdA])
+        prop1 = QC.testProperty "Preserves elements" $ \xs ->
+                  Set.fromList (sort xs) == Set.fromList (xs::[OrdA])
+        prop2 = QC.testProperty "Perserves duplicates" $ \xs ->
+                  List.all (\x -> length (filter (x ==) xs) == length (filter (x ==) (sort xs))) (xs::[OrdA])
+        prop3 = QC.testProperty "Stability" $ \xs ->
+                  let asc ((Indexed x1 n1) : (Indexed x2 n2) : xs) = (x1 /= x2 || n1 < n2) && asc (Indexed x2 n2 : xs)
+                      asc _ = True
+                  in asc (sort (zipWith Indexed (xs::[OrdA]) [0..]))
+
+data Indexed a = Indexed a Int
+instance Eq a => Eq (Indexed a) where
+  (Indexed x1 _) == (Indexed x2 _) = x1 == x2
+instance Ord a => Ord (Indexed a) where
+  (Indexed x1 _) < (Indexed x2 _) = x1 < x2
+  (Indexed x1 _) <= (Indexed x2 _) = x1 <= x2
 
 -- Exercise 2: SMS encoding/decoding
 --
@@ -137,10 +153,10 @@ exercise2 = localOption (QC.QuickCheckMaxRatio 100) $ localOption (QC.QuickCheck
            -- succeed (and keep the other tests green).
 
 encodePrecondition :: [Int] -> Bool
-encodePrecondition xs = True
+encodePrecondition xs = all (\x -> x >= 0 && x <= 127) xs && length xs > 0
 
 decodePrecondition :: [Int] -> Bool
-decodePrecondition xs = True
+decodePrecondition xs = all (\x -> x >= 0 && x <= 255) xs && length xs > 0
 
 failurePrecondition :: [Int] -> Bool
-failurePrecondition xs = True
+failurePrecondition xs = last xs == 0
